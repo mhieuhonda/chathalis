@@ -9,6 +9,7 @@ import '../data/chat_repository.dart';
 import '../gateway/kilo_gateway.dart';
 import '../gateway/models.dart';
 import 'context_window.dart';
+import 'usage_tracker.dart';
 
 /// Drives a single conversation: sending turns, streaming them into the
 /// message list, aborting, retrying and regenerating.
@@ -24,15 +25,18 @@ class ChatController extends ChangeNotifier {
     Strings? strings,
     ChatRepository? repository,
     KiloGateway? gateway,
+    UsageTracker? usage,
   })  : _repo = repository ?? ChatRepository.instance,
         _gateway = gateway ?? KiloGateway(),
-        _strings = strings ?? Strings.of(AppLocale.english);
+        _strings = strings ?? Strings.of(AppLocale.english),
+        _usage = usage ?? UsageTracker.instance;
 
   final String conversationId;
   final bool isNewConversation;
   final ChatRepository _repo;
   final KiloGateway _gateway;
   final Strings _strings;
+  final UsageTracker _usage;
 
   /// Ordered oldest → newest.
   final List<ChatMessage> messages = <ChatMessage>[];
@@ -76,7 +80,7 @@ class ChatController extends ChangeNotifier {
 
   Future<void> send(String rawText) async {
     final text = rawText.trim();
-    if (text.isEmpty || _streaming) return;
+    if (text.isEmpty || _streaming || _usage.locked) return;
 
     if (isNewConversation || !messages.any((m) => m.role == Role.user)) {
       final effectiveTitle = _manualTitle ? title : HalisUtils.titleFrom(text);
@@ -103,18 +107,20 @@ class ChatController extends ChangeNotifier {
     await _repo.insertMessage(conversationId, user);
     _notify();
 
+    _usage.record(); // one request per send, retries included
     await _runTurn();
   }
 
   /// Drops the last assistant reply (if any) and produces a new one.
   Future<void> regenerate() async {
-    if (_streaming) return;
+    if (_streaming || _usage.locked) return;
     while (messages.isNotEmpty && messages.last.role == Role.assistant) {
       final last = messages.removeLast();
       await _repo.deleteMessage(last.id);
     }
     if (messages.isEmpty || messages.last.role != Role.user) return;
     _notify();
+    _usage.record();
     await _runTurn();
   }
 
@@ -249,6 +255,12 @@ class ChatController extends ChangeNotifier {
             _lastError = error;
             if (error.code == HalisErrorCode.cancelled) {
               return _TurnResult.aborted;
+            }
+            if (error.code == HalisErrorCode.rateLimited) {
+              // The server says the hour is up — pin the meter at 100% and
+              // let the lock run exactly once, however often this fires.
+              _usage.onRateLimited();
+              return _TurnResult.fatal;
             }
             if (!sawContent && !sawReasoning) {
               final retryable = error.code == HalisErrorCode.network ||

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../engine/app_store.dart';
 import '../../engine/chat_controller.dart';
+import '../../engine/usage_tracker.dart';
 import '../../gateway/models.dart';
 import '../widgets/halis_mark.dart';
 import 'assistant_view.dart';
@@ -272,17 +273,80 @@ Future<bool?> _confirm(
   );
 }
 
-/// Composer wrapper kept separate so both layouts share it.
+/// Composer wrapper kept separate so both layouts share it. The hourly
+/// usage strip surfaces only when the budget is running low or locked.
 class ComposerProxy extends StatelessWidget {
   const ComposerProxy({super.key});
 
   @override
   Widget build(BuildContext context) {
     final chat = context.watch<ChatController>();
-    return Composer(
-      streaming: chat.isStreaming,
-      onSend: chat.send,
-      onStop: chat.stop,
+    final usage = context.watch<UsageTracker>();
+    final s = context.watch<AppStore>().strings;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (usage.showHint)
+          _UsageStrip(
+            locked: usage.locked,
+            text: usage.locked
+                ? s.usageLockedStrip(usage.remainingLock)
+                : s.usageNear(usage.percent),
+          ),
+        Composer(
+          streaming: chat.isStreaming,
+          locked: usage.locked,
+          onSend: chat.send,
+          onStop: chat.stop,
+        ),
+      ],
+    );
+  }
+}
+
+/// One-line budget reminder that sits just above the composer.
+class _UsageStrip extends StatelessWidget {
+  const _UsageStrip({required this.locked, required this.text});
+
+  final bool locked;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.halis;
+    final color = locked ? c.danger : c.warn;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: locked ? c.dangerSoft : c.warnSoft,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            locked ? Icons.hourglass_top_rounded : Icons.bolt_rounded,
+            size: 15,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: Text(
+                text,
+                key: ValueKey<String>(text),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

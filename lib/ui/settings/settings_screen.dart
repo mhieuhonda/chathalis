@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../../engine/app_store.dart';
+import '../../engine/usage_tracker.dart';
 import '../widgets/halis_mark.dart';
 
 /// Settings: about the app, usage, preferences (appearance, language)
@@ -33,6 +34,9 @@ class SettingsScreen extends StatelessWidget {
           _GroupLabel(s.aboutSection),
           _AboutCard(s: s),
           const SizedBox(height: 22),
+          _GroupLabel(s.usageSection),
+          const _UsageCard(),
+          const SizedBox(height: 22),
           _GroupLabel(s.preferencesSection),
           _PreferencesCard(store: store, s: s),
           const SizedBox(height: 22),
@@ -49,6 +53,162 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The hourly budget, shown as a percentage — the way Claude's usage
+/// screen does. Never request counts, and a caught 429 pins it at 100%
+/// until the cooldown lapses.
+class _UsageCard extends StatelessWidget {
+  const _UsageCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final usage = context.watch<UsageTracker>();
+    final s = context.watch<AppStore>().strings;
+    final c = context.halis;
+    final locked = usage.locked;
+    final percent = usage.percent;
+
+    return _Card(children: [
+      Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: locked ? c.dangerSoft : c.accentSoft,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    locked
+                        ? Icons.hourglass_top_rounded
+                        : Icons.bolt_rounded,
+                    size: 17,
+                    color: locked ? c.danger : c.accent,
+                  ),
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.usageTitle,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.2,
+                          color: c.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        locked ? s.usageLimitReached : s.usageUsed(percent),
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: locked ? c.danger : c.inkSoft,
+                          fontWeight: locked ? FontWeight.w600 : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 260),
+                  child: Text(
+                    '$percent%',
+                    key: ValueKey<int>(percent),
+                    style: TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.5,
+                      color: locked ? c.danger : c.ink,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 15),
+            _UsageBar(fraction: usage.fraction, locked: locked),
+            if (locked) ...[
+              const SizedBox(height: 11),
+              Row(
+                children: [
+                  Icon(Icons.timer_outlined, size: 13, color: c.danger),
+                  const SizedBox(width: 6),
+                  Text(
+                    s.usageChatAgainIn(usage.remainingLock),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: c.danger,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+      _Hairline(),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 11, 16, 12),
+        child: Row(
+          children: [
+            Icon(Icons.autorenew_rounded, size: 13, color: c.inkFaint),
+            const SizedBox(width: 6),
+            Text(
+              s.usageNote,
+              style: TextStyle(
+                fontSize: 11.5,
+                color: c.inkFaint,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ]);
+  }
+}
+
+/// Slim capsule meter; the fill colors up as the budget drains and turns
+/// red the moment the hour is up.
+class _UsageBar extends StatelessWidget {
+  const _UsageBar({required this.fraction, required this.locked});
+
+  final double fraction;
+  final bool locked;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.halis;
+    final fill = locked
+        ? c.danger
+        : (fraction >= 0.8 ? c.warn : c.ink);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(3),
+      child: Container(
+        height: 6,
+        color: c.paper,
+        alignment: Alignment.centerLeft,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(end: fraction.clamp(0.0, 1.0)),
+          duration: const Duration(milliseconds: 420),
+          curve: Curves.easeOutCubic,
+          builder: (context, f, _) => FractionallySizedBox(
+            widthFactor: f,
+            child: Container(height: 6, color: fill),
+          ),
+        ),
       ),
     );
   }
