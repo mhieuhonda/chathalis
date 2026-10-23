@@ -1,6 +1,6 @@
 # ChatHalis
 
-Trợ lý AI samtale elegante cho Android — trắng, đen, và chỉ một chút xanh.
+Trợ lý AI cho Android — trắng, đen, và chỉ một chút xanh.
 
 ChatHalis là ứng dụng chat AI được thiết kế quanh một nguyên tắc duy nhất: **đơn giản đến mức không còn gì để bỏ đi**. Bạn mở app, gõ câu hỏi, Halis trả lời. Không đăng nhập, không cấu hình, không chọn model — mọi thứ chỉ hoạt động.
 
