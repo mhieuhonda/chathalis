@@ -166,6 +166,34 @@ void main() {
       expect(finish.whereType<GatewayToolCallsReady>(), hasLength(1));
       expect((finish.last as GatewayDone).reason, FinishReason.toolCalls);
     });
+
+    test('in-band error frames surface as failures, never swallowed', () {
+      final p = GatewayProtocol();
+      // Some content first, then the gateway gives up mid-stream.
+      p.applyPayload(
+        '{"choices":[{"delta":{"content":"partial answer"}}]}',
+      );
+      final events = p.applyPayload(
+        '{"error":{"message":"upstream provider died"}}',
+      );
+      expect(events, hasLength(1));
+      final failed = events.first;
+      expect(failed, isA<GatewayFailed>());
+      expect((failed as GatewayFailed).error.code, HalisErrorCode.server);
+      expect(failed.error.detail, contains('upstream provider died'));
+    });
+
+    test('error frames with choices do not double-report', () {
+      // A choice frame that happens to carry an error field is treated as
+      // a normal delta frame — the choice content wins.
+      final p = GatewayProtocol();
+      final events = p.applyPayload(
+        '{"choices":[{"delta":{"content":"hi"}}],'
+        '"error":{"message":"ignored"}}',
+      );
+      expect(events, hasLength(1));
+      expect(events.first, isA<GatewayTextDelta>());
+    });
   });
 
   group('KiloGateway.classifyStatus', () {

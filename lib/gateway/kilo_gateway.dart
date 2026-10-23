@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
 import 'models.dart';
+import 'socket_http.dart';
 import 'sse.dart';
 
 /// Cooperative cancellation token shared by the engine and the transport.
@@ -163,6 +165,21 @@ class GatewayProtocol {
         );
       }
     }
+
+    // An in-band error frame (no choices, just an error object) must not
+    // be swallowed — the answer would silently truncate otherwise.
+    if ((choices is! List || choices.isEmpty) && decoded['error'] != null) {
+      final err = decoded['error'];
+      String? message;
+      if (err is Map<String, dynamic> && err['message'] is String) {
+        message = err['message'] as String;
+      } else if (err is String) {
+        message = err;
+      }
+      out.add(GatewayFailed(
+        HalisError(HalisErrorCode.server, message ?? 'stream error'),
+      ));
+    }
     return out;
   }
 
@@ -264,6 +281,9 @@ class KiloGateway {
   static const String _endpoint =
       'https://api.kilo.ai/api/gateway/chat/completions';
 
+  /// Upper bound on how much of a non-200 body is read for diagnostics.
+  static const int _maxErrorBody = 16 * 1024;
+
   /// Never shown in the UI; see the system prompt for the public identity.
   static const String _model = 'kilo-auto/free';
 
@@ -289,31 +309,48 @@ class KiloGateway {
     AbortHandle? abort,
     Duration idleTimeout = const Duration(seconds: 120),
   }) {
-    final client = HttpClient();
-    client.connectionTimeout = _connectTimeout;
     final protocol = GatewayProtocol();
+    final sse = SseDecoder();
     late final StreamController<GatewayEvent> controller;
-    StreamSubscription? subscription;
     var userAborted = false;
     var idleTimedOut = false;
+    var settled = false;
     Timer? watchdog;
+    void Function()? kill;
 
     void teardown() {
       watchdog?.cancel();
-      subscription?.cancel().catchError((_) {});
-      client.close(force: true);
+      kill?.call();
+    }
+
+    void fail(HalisError error) {
+      if (settled) return;
+      settled = true;
+      teardown();
+      controller.add(GatewayFailed(error));
+      unawaited(controller.close());
+    }
+
+    void succeed(List<GatewayEvent> events) {
+      if (settled) return;
+      settled = true;
+      teardown();
+      for (final e in events) {
+        controller.add(e);
+      }
+      unawaited(controller.close());
     }
 
     controller = StreamController<GatewayEvent>(
       onListen: () async {
-        void fail(HalisError error) {
-          controller.add(GatewayFailed(error));
-        }
-
         try {
+          // Registered before the socket exists so a stop request during
+          // the connect window still flips the flag; the socket itself is
+          // destroyed the moment [registerAbort] hands over the kill
+          // switch (the listener fires immediately on an aborted handle).
           abort?._onAbort(() {
             userAborted = true;
-            teardown();
+            kill?.call();
           });
 
           final body = jsonEncode({
@@ -335,50 +372,63 @@ class KiloGateway {
               ],
           });
 
-          final request =
-              await client.openUrl('POST', Uri.parse(_endpoint));
-          request.headers
-            ..set(HttpHeaders.contentTypeHeader, 'application/json')
-            ..set(HttpHeaders.acceptHeader, 'text/event-stream')
-            ..set(HttpHeaders.userAgentHeader,
-                'ChatHalis/1.0 (Android; +https://github.com/mhieuhonda/chathalis)');
-          request.add(utf8.encode(body));
-          await request.flush();
+          final response = await socketHttpPost(
+            uri: Uri.parse(_endpoint),
+            headers: {
+              'content-type': 'application/json',
+              'accept': 'text/event-stream',
+              'user-agent':
+                  'ChatHalis/1.0 (Android; +https://github.com/mhieuhonda/chathalis)',
+            },
+            body: utf8.encode(body),
+            headTimeout: _connectTimeout,
+            registerAbort: (destroy) {
+              kill = destroy;
+            },
+          );
 
-          final response = await request.done.timeout(_connectTimeout);
+          if (userAborted) {
+            fail(const HalisError(HalisErrorCode.cancelled));
+            return;
+          }
           if (response.statusCode != 200) {
-            final text = await response
-                .cast<List<int>>()
-                .transform(utf8.decoder)
-                .join()
-                .timeout(const Duration(seconds: 10));
-            throw _httpError(response.statusCode, text);
+            final text = await _drain(response.body);
+            if (userAborted) {
+              fail(const HalisError(HalisErrorCode.cancelled));
+              return;
+            }
+            fail(_httpError(response.statusCode, text));
+            return;
           }
 
-          final sse = SseDecoder();
           void pulse() {
             watchdog?.cancel();
             watchdog = Timer(idleTimeout, () {
               idleTimedOut = true;
-              client.close(force: true);
+              kill?.call();
             });
           }
 
           pulse();
-          final stream = response.cast<List<int>>().transform(utf8.decoder);
-          subscription = stream.listen(
+          // utf8.decoder is incremental: it stitches multi-byte characters
+          // that land split across TCP chunks — a certainty with streamed
+          // Vietnamese text.
+          response.body.transform(utf8.decoder).listen(
             (chunk) {
+              if (settled) return;
               pulse();
               for (final payload in sse.push(chunk)) {
                 if (payload == '[DONE]') {
-                  for (final e in protocol.finish()) {
-                    controller.add(e);
-                  }
-                  teardown();
-                  unawaited(controller.close());
+                  succeed(protocol.finish());
                   return;
                 }
                 for (final e in protocol.applyPayload(payload)) {
+                  // In-band failures terminate the turn right away — a
+                  // late [DONE] must not append a second terminal.
+                  if (e is GatewayFailed) {
+                    fail(e.error);
+                    return;
+                  }
                   controller.add(e);
                 }
               }
@@ -389,42 +439,57 @@ class KiloGateway {
               } else if (idleTimedOut) {
                 fail(const HalisError(HalisErrorCode.timeout));
               } else {
-                fail(HalisError(HalisErrorCode.network, e.toString()));
+                fail(_classify(e));
               }
-              teardown();
-              controller.close();
             },
             onDone: () {
-              // Stream ended without an explicit [DONE] frame.
-              sse.close();
-              for (final e in protocol.finish()) {
-                controller.add(e);
+              // Stream ended without an explicit [DONE] frame — whatever
+              // assembled so far still counts as a completed turn.
+              for (final payload in sse.close()) {
+                if (payload == '[DONE]') continue;
+                for (final e in protocol.applyPayload(payload)) {
+                  controller.add(e);
+                }
               }
-              teardown();
-              controller.close();
+              succeed(protocol.finish());
             },
             cancelOnError: true,
           );
-        } on TimeoutException {
-          fail(const HalisError(HalisErrorCode.timeout));
-          teardown();
-          controller.close();
         } catch (e) {
           if (userAborted) {
             fail(const HalisError(HalisErrorCode.cancelled));
           } else {
             fail(_classify(e));
           }
-          teardown();
-          controller.close();
         }
       },
       onCancel: () {
+        settled = true;
         teardown();
       },
     );
 
     return controller.stream;
+  }
+
+  /// Reads an error body to text, bounded so a huge or hostile payload
+  /// cannot stall the failure path.
+  static Future<String> _drain(Stream<List<int>> body) async {
+    final buffer = BytesBuilder(copy: true);
+    var taken = 0;
+    try {
+      await for (final chunk in body) {
+        final left = _maxErrorBody - taken;
+        if (left <= 0) break;
+        buffer.add(chunk.length > left ? chunk.sublist(0, left) : chunk);
+        taken += chunk.length;
+        if (taken >= _maxErrorBody) break;
+      }
+    } catch (_) {
+      // The error body is best-effort; the status code already carries
+      // the failure classification.
+    }
+    return utf8.decode(buffer.toBytes(), allowMalformed: true);
   }
 
   /// One [ApiMessage] in chat-completions wire shape. Tool results and
