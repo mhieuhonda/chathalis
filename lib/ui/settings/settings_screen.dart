@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_info.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../../engine/app_store.dart';
@@ -262,7 +263,7 @@ class _AboutCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '1.1.0',
+                          AppInfo.version,
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -287,7 +288,7 @@ class _AboutCard extends StatelessWidget {
         ),
       ),
       _Hairline(),
-      _InfoRow(label: s.version, value: '1.1.0'),
+      _InfoRow(label: s.version, value: AppInfo.version),
       _Hairline(),
       _InfoRow(label: s.engineLabel, value: s.engineValue),
     ]);

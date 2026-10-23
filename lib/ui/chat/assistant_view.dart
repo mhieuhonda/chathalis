@@ -87,7 +87,9 @@ class AssistantView extends StatelessWidget {
                 ErrorCard(
                   message: m.error ?? s.errUnknown,
                   onRetry: onRegenerate,
-                  showRetry: !locked,
+                  // Regenerating replays the newest user turn, so the
+                  // action only makes sense on the newest reply.
+                  showRetry: !locked && isLast,
                 ),
               if (!_live && hasBody) ...[
                 const SizedBox(height: 6),
@@ -245,6 +247,11 @@ class _MarkdownBody extends StatelessWidget {
   Future<void> _openLink(String url) async {
     final uri = Uri.tryParse(url);
     if (uri == null) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      // Nothing on the device can open the link — silently ignore rather
+      // than crash the chat over a bad href.
+    }
   }
 }

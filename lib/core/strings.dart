@@ -24,7 +24,6 @@ class Strings {
   // ------------------------------------------------------------- identity
 
   final String appName = 'ChatHalis';
-  final String assistantName = 'Halis';
   String get assistantByline => _t('Trợ lý AI', 'AI assistant');
 
   /// Shown for conversations whose stored title is empty.
@@ -132,9 +131,6 @@ class Strings {
   String usageUsed(int percent) => _t(
       'Bạn đã dùng $percent% giới hạn chat mỗi giờ.',
       'You\u2019ve used $percent% of your hourly chat limit.');
-  String usageResetsIn(Duration remaining) => _t(
-      'Làm mới sau ${_countdownVi(remaining)}.',
-      'Resets in ${_countdownEn(remaining)}.');
   String get usageLimitReached =>
       _t('Đã đạt giới hạn mỗi giờ.', 'Hourly limit reached.');
   String usageChatAgainIn(Duration remaining) => _t(

@@ -53,8 +53,6 @@ class ChatMessage {
   /// Monotonic order inside the conversation (assigned on insert).
   final int? seq;
 
-  bool get isBusy => false; // placeholder for future streaming marker
-
   /// What Halis did to produce this reply — searches, pages read, time
   /// checks — in the order they ran. Rendered as small chips above the
   /// answer and persisted with the message.
