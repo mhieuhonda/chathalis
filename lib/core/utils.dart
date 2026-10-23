@@ -1,0 +1,81 @@
+import 'dart:math';
+
+/// Small helpers shared across the app.
+abstract final class HalisUtils {
+  /// Cryptographically-random UUID v4.
+  static String uuid() {
+    final rnd = Random.secure();
+    final b = List<int>.generate(16, (_) => rnd.nextInt(256));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    String hex(int v) => v.toRadixString(16).padLeft(2, '0');
+    final h = b.map(hex).join();
+    return '${h.substring(0, 8)}-${h.substring(8, 12)}-'
+        '${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20)}';
+  }
+
+  /// `14:05` style clock time.
+  static String clock(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  /// Short label for a conversation tile: `14:05` today, `T4` this week,
+  /// `12/03` this year, `12/03/2025` otherwise.
+  static String shortDate(DateTime t, [DateTime? now]) {
+    final n = now ?? DateTime.now();
+    final today = DateTime(n.year, n.month, n.day);
+    final day = DateTime(t.year, t.month, t.day);
+    final diffDays = today.difference(day).inDays;
+    if (diffDays <= 0) return clock(t);
+    if (diffDays == 1) return 'Hôm qua';
+    if (diffDays < 7) {
+      const labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+      return labels[t.weekday - 1];
+    }
+    final d = t.day.toString().padLeft(2, '0');
+    final m = t.month.toString().padLeft(2, '0');
+    if (t.year == n.year) return '$d/$m';
+    return '$d/$m/${t.year}';
+  }
+
+  /// Group key used to bucket conversations on the home screen.
+  static String dayGroup(DateTime t, [DateTime? now]) {
+    final n = now ?? DateTime.now();
+    final diffDays = DateTime(n.year, n.month, n.day)
+        .difference(DateTime(t.year, t.month, t.day))
+        .inDays;
+    if (diffDays <= 0) return 'today';
+    if (diffDays == 1) return 'yesterday';
+    if (diffDays < 7) return 'last7';
+    return 'earlier';
+  }
+
+  /// Turns the first user message into a compact conversation title,
+  /// cutting at a word boundary.
+  static String titleFrom(String text, {int max = 48}) {
+    final firstLine =
+        text.trim().split('\n').firstWhere((l) => l.trim().isNotEmpty, orElse: () => '');
+    final compact =
+        firstLine.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (compact.length <= max) return compact;
+    final cut = compact.substring(0, max);
+    final lastSpace = cut.lastIndexOf(' ');
+    return '${(lastSpace > max ~/ 2 ? cut.substring(0, lastSpace) : cut).trimRight()}…';
+  }
+
+  /// One-line preview for the home list.
+  static String previewOf(String text, {int max = 90}) {
+    final flat = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (flat.length <= max) return flat;
+    return '${flat.substring(0, max).trimRight()}…';
+  }
+
+  /// Human-readable duration for the thinking panel: `12 giây`, `1 phút 05`.
+  static String humanDuration(int ms) {
+    if (ms < 1000) return '<1 giây';
+    final s = ms ~/ 1000;
+    if (s < 60) return '$s giây';
+    final m = s ~/ 60;
+    final r = (s % 60).toString().padLeft(2, '0');
+    return '$m phút $r';
+  }
+}
