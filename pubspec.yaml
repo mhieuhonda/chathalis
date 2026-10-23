@@ -1,0 +1,77 @@
+name: chathalis
+description: "ChatHalis — trợ lý AI samtale elegante cho Android."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # state management
+  provider: ^6.1.5
+
+  # local storage
+  sqflite: ^2.4.5
+  path: ^1.9.1
+
+  # LLM-friendly markdown rendering for chat bubbles
+  gpt_markdown: ^1.4.0
+
+  # open links found in answers
+  url_launcher: ^6.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.8
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/brand/ic_legacy.png"
+  adaptive_icon_background: "assets/brand/ic_background.png"
+  adaptive_icon_foreground: "assets/brand/ic_foreground.png"
+  adaptive_icon_monochrome: "assets/brand/ic_monochrome.png"
+  remove_alpha_ios: true
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: "assets/brand/splash_wordmark.png"
+  android_12:
+    color: "#FFFFFF"
+    image: "assets/brand/ic_a12.png"
+  android: true
+  ios: false
+  web: false
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/brand/
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/JetBrainsMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
