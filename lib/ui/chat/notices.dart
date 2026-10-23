@@ -72,12 +72,19 @@ class StoppedNotice extends StatelessWidget {
   }
 }
 
-/// Error card with an inline retry action.
+/// Error card with an inline retry action. The action hides while the
+/// hourly lock stands — a request would only bounce off the gate.
 class ErrorCard extends StatelessWidget {
-  const ErrorCard({super.key, required this.message, required this.onRetry});
+  const ErrorCard({
+    super.key,
+    required this.message,
+    required this.onRetry,
+    this.showRetry = true,
+  });
 
   final String message;
   final VoidCallback onRetry;
+  final bool showRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -110,21 +117,22 @@ class ErrorCard extends StatelessWidget {
               ),
             ],
           ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: onRetry,
-              style: TextButton.styleFrom(
-                foregroundColor: c.danger,
-                minimumSize: const Size(44, 34),
-                textStyle: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+          if (showRetry)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: onRetry,
+                style: TextButton.styleFrom(
+                  foregroundColor: c.danger,
+                  minimumSize: const Size(44, 34),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
+                child: Text(context.watch<AppStore>().strings.retry),
               ),
-              child: Text(context.watch<AppStore>().strings.retry),
             ),
-          ),
         ],
       ),
     );

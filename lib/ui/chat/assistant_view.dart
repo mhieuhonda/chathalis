@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme.dart';
 import '../../engine/app_store.dart';
+import '../../engine/usage_tracker.dart';
 import '../../gateway/models.dart';
 import '../widgets/halis_mark.dart';
 import 'code_block.dart';
@@ -40,6 +41,7 @@ class AssistantView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = context.watch<AppStore>().strings;
+    final locked = context.watch<UsageTracker>().locked;
     final m = message;
     final hasBody = m.content.trim().isNotEmpty;
 
@@ -80,6 +82,7 @@ class AssistantView extends StatelessWidget {
                 ErrorCard(
                   message: m.error ?? s.errUnknown,
                   onRetry: onRegenerate,
+                  showRetry: !locked,
                 ),
               if (!_live && hasBody) ...[
                 const SizedBox(height: 6),
