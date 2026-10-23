@@ -113,7 +113,13 @@ class ChatController extends ChangeNotifier {
         updatedAt: DateTime.now(),
         lastPreview: HalisUtils.previewOf(text),
       );
-      await _repo.ensureConversation(conv);
+      try {
+        await _repo.ensureConversation(conv);
+      } catch (_) {
+        // Storage is best-effort: a failed insert must never block the
+        // turn itself — the conversation still exists in memory.
+        debugPrint('chathalis: failed to create conversation row');
+      }
       if (isNewConversation) {
         title = effectiveTitle;
       }
@@ -126,7 +132,11 @@ class ChatController extends ChangeNotifier {
       createdAt: DateTime.now(),
     );
     messages.add(user);
-    await _repo.insertMessage(conversationId, user);
+    try {
+      await _repo.insertMessage(conversationId, user);
+    } catch (_) {
+      debugPrint('chathalis: failed to persist user message');
+    }
     _notify();
 
     _usage.record(); // one request per send, retries included
@@ -138,7 +148,13 @@ class ChatController extends ChangeNotifier {
     if (_streaming || _usage.locked) return;
     while (messages.isNotEmpty && messages.last.role == Role.assistant) {
       final last = messages.removeLast();
-      await _repo.deleteMessage(last.id);
+      try {
+        await _repo.deleteMessage(last.id);
+      } catch (_) {
+        // A stale row is harmless; the in-memory list is authoritative
+        // for the turn about to run.
+        debugPrint('chathalis: failed to delete message for regenerate');
+      }
     }
     if (messages.isEmpty || messages.last.role != Role.user) return;
     _notify();

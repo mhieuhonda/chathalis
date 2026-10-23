@@ -16,6 +16,11 @@ const int historyTokenBudget = 190_000;
 /// skipped so the model only ever sees complete exchanges, and [excludeId]
 /// keeps the still-streaming assistant placeholder out of the replay while
 /// its own tool rounds are in flight.
+///
+/// The newest replayed message is never dropped: a single message larger
+/// than the whole budget would otherwise vanish and leave the model
+/// answering an empty conversation. It is clipped instead — head kept,
+/// with a marker where the rest was cut.
 List<ApiMessage> composeApiMessages(
   List<ChatMessage> messages, {
   int budget = historyTokenBudget,
@@ -25,15 +30,37 @@ List<ApiMessage> composeApiMessages(
   const charsPerToken = 3.8;
   final history = <ApiMessage>[];
   var remaining = budget;
+  var newestKept = false;
   for (var i = messages.length - 1; i >= 0; i--) {
     final m = messages[i];
     if (m.role == Role.system) continue;
     if (m.id == excludeId) continue;
     if (m.content.trim().isEmpty) continue;
-    final cost = (m.content.length / charsPerToken).ceil() + 4;
-    if (cost > remaining) break;
+
+    var content = m.content;
+    var cost = (content.length / charsPerToken).ceil() + 4;
+    if (cost > remaining) {
+      if (newestKept) break; // older messages are trimmed by design
+      // The newest message must reach the model no matter what — clip it
+      // to whatever the remaining budget affords.
+      var maxChars = ((remaining - 4) * charsPerToken).floor();
+      if (maxChars <= 0) break; // budget already spent; nothing to send
+      // Step back over a split surrogate pair so the cut never lands
+      // inside a character.
+      if (maxChars < content.length &&
+          maxChars > 0 &&
+          content.codeUnitAt(maxChars - 1) >= 0xD800 &&
+          content.codeUnitAt(maxChars - 1) <= 0xDBFF) {
+        maxChars--;
+      }
+      content =
+          '${content.substring(0, maxChars)}\n\n[… the message was too long '
+          'and was cut here — ask the user to resend it in parts]';
+      cost = (content.length / charsPerToken).ceil() + 4;
+    }
     remaining -= cost;
-    history.add(ApiMessage(role: m.role, content: m.content));
+    newestKept = true;
+    history.add(ApiMessage(role: m.role, content: content));
   }
   return [
     ApiMessage(role: Role.system, content: HalisPrompt.build()),

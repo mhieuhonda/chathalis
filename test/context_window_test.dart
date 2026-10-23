@@ -93,6 +93,54 @@ void main() {
       expect(out[out.length - 2].role, Role.assistant);
     });
 
+    test('a single oversized newest message is clipped, never dropped', () {
+      // A message whose token cost far exceeds the whole budget.
+      final giant = 'y' * 4000;
+      final out = composeApiMessages(
+        [_msg(Role.user, giant)],
+        budget: 100,
+      );
+      // System prompt + the clipped user message must both be present.
+      expect(out, hasLength(2));
+      expect(out.last.role, Role.user);
+      expect(out.last.content.length, lessThan(giant.length));
+      expect(out.last.content, startsWith('yyyy'));
+      expect(out.last.content, contains('too long'));
+    });
+
+    test('oversized newest message still leaves room for nothing else', () {
+      final giant = 'z' * 4000;
+      final out = composeApiMessages(
+        [
+          _msg(Role.user, 'cũ'),
+          _msg(Role.assistant, 'cũ nữa'),
+          _msg(Role.user, giant),
+        ],
+        budget: 100,
+      );
+      // The giant message consumes the budget; older turns stay out.
+      expect(out.map((m) => m.content), isNot(contains('cũ')));
+      expect(out.last.content, contains('too long'));
+    });
+
+    test('clipping never splits a surrogate pair', () {
+      // Emoji are surrogate pairs; the cut must not land mid-pair.
+      final giant = '😀' * 600;
+      final out = composeApiMessages([_msg(Role.user, giant)], budget: 40);
+      final clipped = out.last.content;
+      // Decoding the string through JSON round-trip must not throw.
+      expect(() => clipped.codeUnits, returnsNormally);
+      for (var i = 0; i < clipped.length; i++) {
+        final u = clipped.codeUnitAt(i);
+        if (u >= 0xDC00 && u <= 0xDFFF) {
+          // A low surrogate must be preceded by its high surrogate.
+          expect(i, greaterThan(0));
+          final prev = clipped.codeUnitAt(i - 1);
+          expect(prev, inInclusiveRange(0xD800, 0xDBFF));
+        }
+      }
+    });
+
     test('32k output cap is the configured max of the gateway client', () {
       expect(KiloGateway.maxOutputTokens, 32768);
     });
