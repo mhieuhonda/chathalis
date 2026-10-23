@@ -1,55 +1,65 @@
 # ChatHalis
 
-Trợ lý AI cho Android — trắng, đen, và chỉ một chút xanh.
+An AI assistant for Android — paper, ink, and a single drop of blue.
 
-ChatHalis là ứng dụng chat AI được thiết kế quanh một nguyên tắc duy nhất: **đơn giản đến mức không còn gì để bỏ đi**. Bạn mở app, gõ câu hỏi, Halis trả lời. Không đăng nhập, không cấu hình, không chọn model — mọi thứ chỉ hoạt động.
+ChatHalis is built around one principle: **so simple there is nothing left to remove**. Open the app, type a question, Halis answers. No sign-up, no configuration, no model picking — everything just works.
 
-## Tính năng
+## Features
 
-- **Chat tức thì** — phản hồi streaming theo từng token, hiển thị đánh máy trực tiếp
-- **Khu vực suy nghĩ** — quá trình tư duy của Halis hiển thị riêng, gập/mở được, kèm thời gian suy nghĩ
-- **Markdown đẹp** — heading, bảng, danh sách, và code block tối với nút sao chép
-- **Lịch sử cục bộ** — mọi cuộc trò chuyện lưu trong SQLite ngay trên máy, không đâu khác
-- **Đổi tên / xóa / tạo lại câu trả lời**, dừng giữa dòng và giữ lại phần đã viết
-- **Giao diện trắng–đen**, typography Inter, dấu chấm xanh Halis làm điểm nhấn duy nhất
+- **Instant chat** — streaming replies token by token, live typing on screen
+- **Thinking space** — Halis' chain of thought in its own collapsible panel with thinking time
+- **Beautiful Markdown** — headings, tables, lists, and dark code blocks with a copy button
+- **Local history** — every conversation lives in SQLite on your device, nowhere else
+- **Usage meter** — a Claude-style percentage of your hourly chat limit, right in Settings
+- **Light & dark** — light by default, dark one tap away; the look follows you
+- **English & Tiếng Việt** — English out of the box, Vietnamese in Settings
+- **Rename / delete / regenerate answers**, stop mid-stream and keep what was written
 
-## Yêu cầu
+## Usage limits
+
+Chatting runs on an hourly budget of 200 requests, shown as a percentage — never as raw counts. Filling the budget, or the server answering 429, pins the meter at 100% and pauses new messages for 1 h 05 m. The pause is applied once per window: retrying during it never adds time.
+
+## Requirements
 
 | | |
 |---|---|
-| Android | 7.1.1 (API 25) trở lên |
+| Android | 7.1.1 (API 25) or newer |
 | Flutter | 3.47 stable |
 | Dart | 3.13 |
 
-## Build & chạy
+## Build & run
 
 ```bash
 flutter pub get
-flutter run                 # debug trên máy ảo / thiết bị
-flutter build apk --release # APK release
-flutter test                # bộ test đơn vị
+flutter run                 # debug on an emulator / device
+flutter build apk --release # release APK
+flutter test                # unit tests
 ```
 
-## Kiến trúc
+## Architecture
 
 ```
 lib/
-├── core/        design tokens, chuỗi văn bản, tiện ích
-├── gateway/     client Kilo Gateway: SSE, phân tích chunk, phân loại lỗi
-├── engine/      vòng đời một lượt chat: stream, abort, retry, giới hạn output
+├── core/        design tokens (light + dark), strings (en + vi), small utils
+├── gateway/     Kilo Gateway client: SSE, chunk parsing, error taxonomy
+├── engine/      chat turns (stream, abort, retry), app store, usage tracker
 ├── data/        SQLite: conversations, messages
-├── prompt/      system prompt định danh Halis
-└── ui/          home, chat, settings — và các widget dùng chung
+├── prompt/      the Halis identity system prompt
+└── ui/          home, chat, settings — and shared widgets
 ```
 
-Một lượt chat đi qua bốn lớp: `ui` gởi văn bản tới `engine`, engine gọi `gateway` với lịch sử đã được cắt gọn theo ngân sách token (`context_window.dart`), các sự kiện streaming (văn bản / suy nghĩ / kết thúc) được reduce vào message, rồi chốt xuống `data` khi lượt kết thúc.
+A chat turn passes through four layers: `ui` hands text to the `engine`, the engine calls the `gateway` with history trimmed to the token budget (`context_window.dart`), streaming events (text / thinking / done) reduce into the message, then persist via `data` when the turn ends. Usage accounting runs alongside: every send counts against the rolling hour, a 429 locks the meter at 100% for the cooldown, and the tracker survives restarts.
 
-Giới hạn đầu ra của mỗi câu trả lời là 32.768 token; khi một câu trả lời bị ngắt vì chạm giới hạn, app hiển thị thông báo ngay dưới tin nhắn.
+Each reply is capped at 32,768 output tokens; when a reply is cut by the cap, a notice shows right under the message.
 
-## Riêng tư
+## Releases
 
-ChatHalis không có tài khoản và không có máy chủ của riêng nó. Lịch sử trò chuyện nằm trong SQLite trên thiết bị, và bạn có thể xóa sạch trong Cài đặt bất cứ lúc nào.
+Publishing a release triggers the GitHub Action in `.github/workflows/release.yml`, which builds the APK and attaches it — plus its sha256 — to that release.
+
+## Privacy
+
+ChatHalis has no accounts and no server of its own. Your history stays in SQLite on the device, and you can wipe everything from Settings at any time.
 
 ---
 
-Halis · một dự án của Hieu Louis
+Halis · a project by Hieu Louis

@@ -1,0 +1,57 @@
+name: Release APK
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and attach APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Pinned so the build always runs on Dart 3.13.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Name the artifact after the release
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          version="${tag#v}"
+          cp build/app/outputs/flutter-apk/app-release.apk "ChatHalis-${version}.apk"
+          sha256sum "ChatHalis-${version}.apk" > "ChatHalis-${version}.apk.sha256"
+
+      - name: Attach APK to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: |
+            ChatHalis-*.apk
+            ChatHalis-*.apk.sha256

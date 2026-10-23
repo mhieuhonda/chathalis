@@ -262,7 +262,7 @@ class _AboutCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '1.0.0',
+                          '1.1.0',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -287,7 +287,7 @@ class _AboutCard extends StatelessWidget {
         ),
       ),
       _Hairline(),
-      _InfoRow(label: s.version, value: '1.0.0'),
+      _InfoRow(label: s.version, value: '1.1.0'),
       _Hairline(),
       _InfoRow(label: s.engineLabel, value: s.engineValue),
     ]);
