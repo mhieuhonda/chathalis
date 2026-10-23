@@ -102,6 +102,70 @@ void main() {
       final finish = p.finish();
       expect((finish.last as GatewayDone).reason, FinishReason.stop);
     });
+
+    test('tool call fragments reassemble across frames', () {
+      // Recorded live: id and name land first, arguments trickle in pieces.
+      final p = GatewayProtocol();
+      final events = [
+        ...p.applyPayload(
+          '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_abc",'
+          '"type":"function","function":{"name":"websearch","arguments":""}}]}}]}',
+        ),
+        ...p.applyPayload(
+          '{"choices":[{"delta":{"tool_calls":[{"index":0,'
+          '"function":{"arguments":"{\\"query\\": \\"Flutter 3.47"}}]}}]}',
+        ),
+        ...p.applyPayload(
+          '{"choices":[{"delta":{"tool_calls":[{"index":0,'
+          '"function":{"arguments":" release notes\\"}"}}]}}]}',
+        ),
+        ...p.applyPayload(
+          '{"choices":[{"delta":{},"finish_reason":"tool_calls",'
+          '"native_finish_reason":"tool_calls"}]}',
+        ),
+      ];
+      expect(events, isEmpty); // nothing visible streams for tool calls
+
+      final finish = p.finish();
+      final ready = finish.whereType<GatewayToolCallsReady>().toList();
+      expect(ready, hasLength(1));
+      final calls = ready.single.calls;
+      expect(calls, hasLength(1));
+      expect(calls.single.id, 'call_abc');
+      expect(calls.single.name, 'websearch');
+      expect(calls.single.arguments, '{"query": "Flutter 3.47 release notes"}');
+      expect((finish.last as GatewayDone).reason, FinishReason.toolCalls);
+    });
+
+    test('two parallel tool calls keep their own buffers', () {
+      final p = GatewayProtocol();
+      p.applyPayload(
+        '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"a",'
+        '"function":{"name":"websearch","arguments":"{\\"query\\":\\"x\\"}"}}]}}]}',
+      );
+      p.applyPayload(
+        '{"choices":[{"delta":{"tool_calls":[{"index":1,"id":"b",'
+        '"function":{"name":"datetime","arguments":"{}"}}]}}]}',
+      );
+      p.applyPayload('{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}');
+      final calls = p.finish().whereType<GatewayToolCallsReady>().single.calls;
+      expect(calls.map((c) => c.name), ['websearch', 'datetime']);
+      expect(calls.map((c) => c.id), ['a', 'b']);
+    });
+
+    test('accumulated calls promote a plain stop to a tool round', () {
+      // Some backends finish tool turns with `stop`; the calls themselves
+      // are the authoritative signal.
+      final p = GatewayProtocol();
+      p.applyPayload(
+        '{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c",'
+        '"function":{"name":"datetime","arguments":"{}"}}]},'
+        '"finish_reason":"stop"}]}',
+      );
+      final finish = p.finish();
+      expect(finish.whereType<GatewayToolCallsReady>(), hasLength(1));
+      expect((finish.last as GatewayDone).reason, FinishReason.toolCalls);
+    });
   });
 
   group('KiloGateway.classifyStatus', () {

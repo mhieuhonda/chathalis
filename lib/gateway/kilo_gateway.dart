@@ -29,10 +29,21 @@ class AbortHandle {
       _listeners.add(listener);
     }
   }
+
+  /// Completes the moment [abort] fires. Used to race tool executions
+  /// against the user's stop button; never completes otherwise, and the
+  /// handle is discarded with the turn either way.
+  Future<void> get cancelled {
+    final c = Completer<void>();
+    _onAbort(() {
+      if (!c.isCompleted) c.complete();
+    });
+    return c.future;
+  }
 }
 
-/// Stable error codes, in the spirit of deepseek-harness's error taxonomy.
-/// The transport stays locale-free; the engine maps codes to user text.
+/// Stable error codes shared by the transport and the engine. The transport
+/// stays locale-free; the engine maps codes to user text.
 enum HalisErrorCode {
   network,
   timeout,
@@ -73,6 +84,14 @@ final class GatewayUsageInfo extends GatewayEvent {
   final TurnUsage usage;
 }
 
+/// Emitted once per turn when the model asked for tools, right before the
+/// terminal [GatewayDone]. The calls arrive fully assembled — argument
+/// fragments streamed across frames are stitched back together here.
+final class GatewayToolCallsReady extends GatewayEvent {
+  const GatewayToolCallsReady(this.calls);
+  final List<ToolCall> calls;
+}
+
 final class GatewayDone extends GatewayEvent {
   const GatewayDone(this.reason);
   final FinishReason reason;
@@ -87,10 +106,12 @@ final class GatewayFailed extends GatewayEvent {
 ///
 /// Kept free of I/O so it can be unit-tested against recorded chunks.
 /// Understands the reasoning dialects seen on the wire (`reasoning_content`,
-/// `reasoning`, `reasoning_details[]`).
+/// `reasoning`, `reasoning_details[]`) and reassembles streamed tool-call
+/// fragments, which arrive indexed and split across arbitrary frame edges.
 class GatewayProtocol {
   String? _finishReason;
   TurnUsage? _usage;
+  final Map<int, _PendingToolCall> _pendingCalls = {};
 
   List<GatewayEvent> applyPayload(String payload) {
     final out = <GatewayEvent>[];
@@ -116,6 +137,7 @@ class GatewayProtocol {
           if (content is String && content.isNotEmpty) {
             out.add(GatewayTextDelta(content));
           }
+          _absorbToolCallDeltas(delta['tool_calls']);
         }
         final finish = choice['finish_reason'];
         if (finish is String && finish.isNotEmpty) {
@@ -144,15 +166,57 @@ class GatewayProtocol {
     return out;
   }
 
-  /// Events to emit once the byte stream has ended. A stream that ended
-  /// without an explicit reason is treated as a normal stop.
+  /// Events to emit once the byte stream has ended. Tool calls come first
+  /// (when the model requested any), then usage, then the terminal done.
+  /// A stream that ended without an explicit reason is treated as a normal
+  /// stop — unless tool calls accumulated, which makes the turn a tool
+  /// round regardless of how the backend labelled it.
   List<GatewayEvent> finish() {
-    final reason =
-        _finishReason == null ? FinishReason.stop : finishReasonFromWire(_finishReason);
+    var reason = _finishReason == null
+        ? FinishReason.stop
+        : finishReasonFromWire(_finishReason);
+    final calls = _assembledCalls();
+    if (calls.isNotEmpty && reason != FinishReason.toolCalls) {
+      reason = FinishReason.toolCalls;
+    }
     return [
       if (_usage != null) GatewayUsageInfo(_usage!),
+      if (calls.isNotEmpty) GatewayToolCallsReady(calls),
       GatewayDone(reason),
     ];
+  }
+
+  void _absorbToolCallDeltas(Object? raw) {
+    if (raw is! List) return;
+    for (final entry in raw) {
+      if (entry is! Map<String, dynamic>) continue;
+      final index = _toInt(entry['index']) ?? _pendingCalls.length;
+      final pending = _pendingCalls.putIfAbsent(index, _PendingToolCall.new);
+      final id = entry['id'];
+      if (id is String && id.isNotEmpty) pending.id = id;
+      final fn = entry['function'];
+      if (fn is! Map<String, dynamic>) continue;
+      final name = fn['name'];
+      if (name is String && name.isNotEmpty) pending.name.write(name);
+      final args = fn['arguments'];
+      if (args is String) pending.arguments.write(args);
+    }
+  }
+
+  List<ToolCall> _assembledCalls() {
+    final indices = _pendingCalls.keys.toList()..sort();
+    final calls = <ToolCall>[];
+    for (var i = 0; i < indices.length; i++) {
+      final p = _pendingCalls[indices[i]]!;
+      final name = p.name.toString();
+      if (name.isEmpty) continue; // an index with no callable shape
+      calls.add(ToolCall(
+        id: p.id ?? 'call_$i',
+        name: name,
+        arguments: p.arguments.toString(),
+      ));
+    }
+    return calls;
   }
 
   static String? _reasoningOf(Map<String, dynamic> delta) {
@@ -179,6 +243,14 @@ class GatewayProtocol {
       v is int ? v : (v is num ? v.toInt() : null);
 }
 
+/// Accumulates one tool call whose id, name and arguments may each be split
+/// across many streamed frames.
+final class _PendingToolCall {
+  String? id;
+  final StringBuffer name = StringBuffer();
+  final StringBuffer arguments = StringBuffer();
+}
+
 /// Thin client for the Kilo Gateway — a keyless, OpenAI-compatible
 /// chat-completions endpoint.
 ///
@@ -202,12 +274,17 @@ class KiloGateway {
 
   /// Streams a single assistant turn for [messages].
   ///
+  /// When [tools] is non-empty, the tool catalog is offered to the model; a
+  /// turn that ends in tool calls is signalled by [GatewayToolCallsReady]
+  /// plus a [GatewayDone] carrying [FinishReason.toolCalls].
+  ///
   /// The returned stream always terminates, either with a [GatewayDone] or a
   /// [GatewayFailed]. An aborted request yields [GatewayFailed] with code
   /// [HalisErrorCode.cancelled]; the engine keeps whatever partial content
   /// arrived before the abort.
   Stream<GatewayEvent> chat({
     required List<ApiMessage> messages,
+    List<ToolSpec>? tools,
     int maxTokens = maxOutputTokens,
     AbortHandle? abort,
     Duration idleTimeout = const Duration(seconds: 120),
@@ -241,12 +318,21 @@ class KiloGateway {
 
           final body = jsonEncode({
             'model': _model,
-            'messages': [
-              for (final m in messages)
-                {'role': m.role.name, 'content': m.content},
-            ],
+            'messages': [for (final m in messages) _wireMessage(m)],
             'stream': true,
             'max_tokens': maxTokens,
+            if (tools != null && tools.isNotEmpty)
+              'tools': [
+                for (final t in tools)
+                  {
+                    'type': 'function',
+                    'function': {
+                      'name': t.name,
+                      'description': t.description,
+                      'parameters': t.parameters,
+                    },
+                  },
+              ],
           });
 
           final request =
@@ -340,6 +426,30 @@ class KiloGateway {
 
     return controller.stream;
   }
+
+  /// One [ApiMessage] in chat-completions wire shape. Tool results and
+  /// assistant tool-call decisions follow the standard function-calling
+  /// conventions of the protocol.
+  static Map<String, dynamic> _wireMessage(ApiMessage m) => switch (m) {
+        _ when m.role == Role.tool => {
+            'role': 'tool',
+            'content': m.content,
+            'tool_call_id': m.toolCallId ?? '',
+          },
+        _ when m.role == Role.assistant && m.toolCalls.isNotEmpty => {
+            'role': 'assistant',
+            'content': m.content,
+            'tool_calls': [
+              for (final c in m.toolCalls)
+                {
+                  'id': c.id,
+                  'type': 'function',
+                  'function': {'name': c.name, 'arguments': c.arguments},
+                },
+            ],
+          },
+        _ => {'role': m.role.name, 'content': m.content},
+      };
 
   HalisError _classify(Object e) {
     if (e is HalisError) return e;
