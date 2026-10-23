@@ -32,6 +32,10 @@ jobs:
       - name: Pub get
         run: flutter pub get
 
+      # The repository tests run on ffi sqlite.
+      - name: Install sqlite for tests
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+
       - name: Analyze
         run: flutter analyze
 
