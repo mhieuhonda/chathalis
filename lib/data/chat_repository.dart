@@ -83,6 +83,7 @@ class ChatRepository {
         'error': m.error,
         'finish_reason': m.truncated ? 'length' : 'stop',
         'reasoning_ms': m.reasoningMs,
+        'tools': ToolUse.listToJson(m.toolUses),
         'created_at': m.createdAt.millisecondsSinceEpoch,
       };
 
@@ -160,6 +161,7 @@ class ChatRepository {
           error: r['error'] as String?,
           truncated: r['finish_reason'] == 'length',
           reasoningMs: r['reasoning_ms'] as int?,
+          toolUses: ToolUse.listFromJson((r['tools'] ?? '') as String),
           seq: r['seq'] as int?,
         ),
     ];

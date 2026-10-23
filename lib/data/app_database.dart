@@ -12,10 +12,23 @@ class AppDatabase {
     final dir = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dir, 'chathalis.db'),
-      version: 1,
+      version: 2,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-      onCreate: (db, version) async {
-        await db.execute('''
+      onCreate: (db, version) async => _create(db),
+      onUpgrade: (db, from, to) async {
+        if (from < 2) {
+          // Tool activity chips, stored as a JSON array per message.
+          await db.execute(
+            "ALTER TABLE messages ADD COLUMN tools TEXT NOT NULL DEFAULT ''",
+          );
+        }
+      },
+    );
+    return _db!;
+  }
+
+  static Future<void> _create(Database db) async {
+    await db.execute('''
           CREATE TABLE conversations(
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL DEFAULT '',
@@ -24,7 +37,7 @@ class AppDatabase {
             updated_at INTEGER NOT NULL
           )
         ''');
-        await db.execute('''
+    await db.execute('''
           CREATE TABLE messages(
             id TEXT PRIMARY KEY,
             conversation_id TEXT NOT NULL,
@@ -36,15 +49,13 @@ class AppDatabase {
             error TEXT,
             finish_reason TEXT,
             reasoning_ms INTEGER,
+            tools TEXT NOT NULL DEFAULT '',
             created_at INTEGER NOT NULL,
             FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
           )
         ''');
-        await db.execute(
-          'CREATE UNIQUE INDEX idx_messages_conv_seq ON messages(conversation_id, seq)',
-        );
-      },
+    await db.execute(
+      'CREATE UNIQUE INDEX idx_messages_conv_seq ON messages(conversation_id, seq)',
     );
-    return _db!;
   }
 }

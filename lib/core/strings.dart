@@ -78,6 +78,20 @@ class Strings {
       'câu trả lời này đã bị ngắt vì đạt giới hạn đầu ra',
       'this reply was cut off because it reached the output limit');
 
+  // ---------------------------------------------------------------- tools
+
+  /// Display name of a tool, shown in the activity chips above an answer.
+  String toolName(String tool) => switch (tool) {
+        'websearch' => _t('Tìm trên web', 'Web search'),
+        'webfetch' => _t('Đọc trang', 'Read page'),
+        'datetime' => _t('Thời gian', 'Date & time'),
+        _ => tool,
+      };
+
+  /// While a tool is still running: `Tìm trên web · thời tiết Huế`.
+  String toolDoing(String tool, String label) =>
+      label.isEmpty ? toolName(tool) : '${toolName(tool)} · $label';
+
   // ------------------------------------------------------------ settings
 
   String get settings => _t('Cài đặt', 'Settings');

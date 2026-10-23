@@ -12,6 +12,7 @@ import '../widgets/halis_mark.dart';
 import 'code_block.dart';
 import 'notices.dart';
 import 'thinking_panel.dart';
+import 'tool_trace.dart';
 
 /// How an assistant reply is laid out: avatar on the left, then the thinking
 /// panel, the markdown answer, and any notices — streaming or finished.
@@ -57,6 +58,10 @@ class AssistantView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (m.toolUses.isNotEmpty) ...[
+                ToolTraceView(uses: m.toolUses),
+                const SizedBox(height: 10),
+              ],
               if (m.reasoning.trim().isNotEmpty) ...[
                 ThinkingPanel(
                   reasoning: m.reasoning,

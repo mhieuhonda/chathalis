@@ -13,10 +13,11 @@ ChatMessage _msg(Role role, String content) => ChatMessage(
 
 void main() {
   group('composeApiMessages', () {
-    test('system prompt always leads', () {
+    test('system prompt always leads, identity core intact', () {
       final out = composeApiMessages([_msg(Role.user, 'xin chào')]);
       expect(out.first.role, Role.system);
-      expect(out.first.content, HalisPrompt.identity);
+      expect(out.first.content, contains(HalisPrompt.identity));
+      expect(out.first.content, contains('Today is'));
       expect(out, hasLength(2));
     });
 
@@ -70,6 +71,26 @@ void main() {
       final out = composeApiMessages([_msg(Role.user, 'q'), m]);
       expect(out.last.content, 'short');
       expect(out.any((x) => x.content.contains('suy nghĩ')), isFalse);
+    });
+
+    test('tool traffic is appended after the replayed history', () {
+      final tail = [
+        ApiMessage.toolRequest(
+          content: '',
+          toolCalls: const [
+            ToolCall(id: 'c1', name: 'websearch', arguments: '{"query":"x"}'),
+          ],
+        ),
+        ApiMessage.toolResult(callId: 'c1', content: '1. [A](https://a)\nhi'),
+      ];
+      final out = composeApiMessages(
+        [_msg(Role.user, 'hôm nay thời tiết thế nào?')],
+        tail: tail,
+      );
+      expect(out.last.role, Role.tool);
+      expect(out.last.toolCallId, 'c1');
+      expect(out[out.length - 2].toolCalls, isNotEmpty);
+      expect(out[out.length - 2].role, Role.assistant);
     });
 
     test('32k output cap is the configured max of the gateway client', () {

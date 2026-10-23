@@ -1,7 +1,7 @@
 name: chathalis
 description: "ChatHalis — trợ lý AI samtale elegante cho Android."
 publish_to: "none"
-version: 1.1.0+2
+version: 1.2.0+3
 
 environment:
   sdk: ^3.13.5
@@ -21,6 +21,9 @@ dependencies:
 
   # LLM-friendly markdown rendering for chat bubbles
   gpt_markdown: ^1.4.0
+
+  # HTML parsing behind the websearch / webfetch tools
+  html: ^0.15.6
 
   # open links found in answers
   url_launcher: ^6.3.3

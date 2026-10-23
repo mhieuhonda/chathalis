@@ -8,6 +8,7 @@ ChatHalis is built around one principle: **so simple there is nothing left to re
 
 - **Instant chat** — streaming replies token by token, live typing on screen
 - **Thinking space** — Halis' chain of thought in its own collapsible panel with thinking time
+- **Tool use** — Halis can search the web, read pages, and check the device clock; each step shows as a small chip above the answer
 - **Beautiful Markdown** — headings, tables, lists, and dark code blocks with a copy button
 - **Local history** — every conversation lives in SQLite on your device, nowhere else
 - **Usage meter** — a Claude-style percentage of your hourly chat limit, right in Settings
@@ -42,13 +43,14 @@ flutter test                # unit tests
 lib/
 ├── core/        design tokens (light + dark), strings (en + vi), small utils
 ├── gateway/     Kilo Gateway client: SSE, chunk parsing, error taxonomy
-├── engine/      chat turns (stream, abort, retry), app store, usage tracker
-├── data/        SQLite: conversations, messages
-├── prompt/      the Halis identity system prompt
+├── engine/      chat turns (stream, abort, retry), tool rounds, app store, usage
+├── tools/       built-in tools: websearch, webfetch, datetime
+├── data/        SQLite: conversations, messages, tool activity
+├── prompt/      the Halis identity system prompt and tool playbook
 └── ui/          home, chat, settings — and shared widgets
 ```
 
-A chat turn passes through four layers: `ui` hands text to the `engine`, the engine calls the `gateway` with history trimmed to the token budget (`context_window.dart`), streaming events (text / thinking / done) reduce into the message, then persist via `data` when the turn ends. Usage accounting runs alongside: every send counts against the rolling hour, a 429 locks the meter at 100% for the cooldown, and the tracker survives restarts.
+A chat turn passes through four layers: `ui` hands text to the `engine`, the engine calls the `gateway` with history trimmed to the token budget (`context_window.dart`), streaming events (text / thinking / done) reduce into the message, then persist via `data` when the turn ends. When a reply needs fresh facts, the model may ask for a tool mid-turn: the engine runs it on the device (`tools/`), streams the result back, and the model continues — capped at six rounds so an answer always lands. Tool activity is kept in a JSON column next to the message and rendered as chips. Usage accounting runs alongside: every send counts against the rolling hour, a 429 locks the meter at 100% for the cooldown, and the tracker survives restarts.
 
 Each reply is capped at 32,768 output tokens; when a reply is cut by the cap, a notice shows right under the message.
 
