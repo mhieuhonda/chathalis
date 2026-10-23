@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/strings.dart';
 import '../../core/theme.dart';
+import '../../engine/app_store.dart';
 import '../../gateway/models.dart';
 import '../widgets/halis_mark.dart';
 import 'code_block.dart';
@@ -38,6 +39,7 @@ class AssistantView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.watch<AppStore>().strings;
     final m = message;
     final hasBody = m.content.trim().isNotEmpty;
 
@@ -76,7 +78,7 @@ class AssistantView extends StatelessWidget {
                 const StoppedNotice(),
               if (m.state == MessageState.failed && !_live)
                 ErrorCard(
-                  message: m.error ?? HalisStrings.errUnknown,
+                  message: m.error ?? s.errUnknown,
                   onRetry: onRegenerate,
                 ),
               if (!_live && hasBody) ...[
@@ -111,10 +113,11 @@ class _Actions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.watch<AppStore>().strings;
     return Row(
       children: [
         _GhostIcon(
-          tooltip: HalisStrings.copy,
+          tooltip: s.copy,
           icon: Icons.copy_rounded,
           onTap: () async {
             await Clipboard.setData(ClipboardData(text: message.content));
@@ -124,7 +127,7 @@ class _Actions extends StatelessWidget {
         if (isLastAssistant) ...[
           const SizedBox(width: 4),
           _GhostIcon(
-            tooltip: HalisStrings.regenerate,
+            tooltip: s.regenerate,
             icon: Icons.refresh_rounded,
             onTap: onRegenerate,
           ),
@@ -147,18 +150,19 @@ class _GhostIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.halis;
     return Tooltip(
       message: tooltip,
       waitDuration: const Duration(milliseconds: 600),
       child: Material(
-        color: HalisPalette.surface,
+        color: c.surface,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(7),
-            child: Icon(icon, size: 15, color: HalisPalette.inkSoft),
+            child: Icon(icon, size: 15, color: c.inkSoft),
           ),
         ),
       ),
@@ -175,6 +179,7 @@ class _MarkdownBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.halis;
     // A caret appended while streaming: unclosed code fences pick it up
     // inside the block, everywhere else it reads as a plain cursor.
     final data = streaming ? '$text ▍' : text;
@@ -184,40 +189,40 @@ class _MarkdownBody extends StatelessWidget {
     // libraries' ThemeExtension types apart.
     return GptMarkdownTheme(
       gptThemeData: GptMarkdownThemeData(
-        brightness: Brightness.light,
-        linkColor: HalisPalette.accent,
-        linkHoverColor: HalisPalette.accent,
-        h1: const TextStyle(
+        brightness: Theme.of(context).brightness,
+        linkColor: c.accent,
+        linkHoverColor: c.accent,
+        h1: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           height: 1.35,
-          color: HalisPalette.ink,
+          color: c.ink,
         ),
-        h2: const TextStyle(
+        h2: TextStyle(
           fontSize: 17.5,
           fontWeight: FontWeight.w700,
           height: 1.35,
-          color: HalisPalette.ink,
+          color: c.ink,
         ),
-        h3: const TextStyle(
+        h3: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w600,
           height: 1.4,
-          color: HalisPalette.ink,
+          color: c.ink,
         ),
-        inlineCode: const InlineCodeStyle(
+        inlineCode: InlineCodeStyle(
           fontFamily: 'JetBrainsMono',
-          color: HalisPalette.ink,
-          backgroundColor: HalisPalette.surface,
+          color: c.ink,
+          backgroundColor: c.surface,
         ),
       ),
       child: GptMarkdown(
         data,
         isStreaming: false,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 15,
           height: 1.6,
-          color: HalisPalette.ink,
+          color: c.ink,
         ),
         codeBuilder: (context, name, code, closed) => CodeBlockView(
           language: name,

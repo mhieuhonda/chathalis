@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import '../core/strings.dart';
+import 'package:flutter/foundation.dart';
+
 import 'models.dart';
 import 'sse.dart';
 
@@ -31,29 +32,22 @@ class AbortHandle {
 }
 
 /// Stable error codes, in the spirit of deepseek-harness's error taxonomy.
-enum HalisErrorCode { network, timeout, server, badRequest, cancelled, unknown }
+/// The transport stays locale-free; the engine maps codes to user text.
+enum HalisErrorCode {
+  network,
+  timeout,
+  server,
+  badRequest,
+  rateLimited,
+  cancelled,
+  unknown,
+}
 
 class HalisError implements Exception {
   const HalisError(this.code, [this.detail]);
 
   final HalisErrorCode code;
   final String? detail;
-
-  String get userMessage {
-    switch (code) {
-      case HalisErrorCode.network:
-        return HalisStrings.errNetwork;
-      case HalisErrorCode.timeout:
-        return HalisStrings.errTimeout;
-      case HalisErrorCode.server:
-        return HalisStrings.errServer;
-      case HalisErrorCode.badRequest:
-      case HalisErrorCode.unknown:
-        return HalisStrings.errUnknown;
-      case HalisErrorCode.cancelled:
-        return 'Đã dừng';
-    }
-  }
 
   @override
   String toString() => 'HalisError($code${detail == null ? '' : ': $detail'})';
@@ -368,10 +362,17 @@ class KiloGateway {
         }
       }
     } catch (_) {}
-    final code = status >= 500
-        ? HalisErrorCode.server
-        : (status >= 400 ? HalisErrorCode.badRequest : HalisErrorCode.unknown);
+    final code = classifyStatus(status);
     return HalisError(code, 'HTTP $status${message == null ? '' : ': $message'}');
   }
+
+  /// HTTP status → stable error code. 429 is the rate limit.
+  @visibleForTesting
+  static HalisErrorCode classifyStatus(int status) => switch (status) {
+        429 => HalisErrorCode.rateLimited,
+        >= 500 => HalisErrorCode.server,
+        >= 400 => HalisErrorCode.badRequest,
+        _ => HalisErrorCode.unknown,
+      };
 }
 

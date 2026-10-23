@@ -7,7 +7,7 @@ import '../../core/theme.dart';
 /// Drawn rather than rasterized so it stays crisp at every size, from the
 /// 14px avatar chip to the 72px empty-state glyph.
 class HalisMark extends StatelessWidget {
-  const HalisMark({super.key, this.size = 24, this.color = HalisPalette.paper});
+  const HalisMark({super.key, this.size = 24, required this.color});
 
   final double size;
   final Color color;
@@ -60,7 +60,7 @@ class _HalisMarkPainter extends CustomPainter {
   bool shouldRepaint(covariant _HalisMarkPainter old) => old.color != color;
 }
 
-/// Round ink chip with the white mark — the assistant avatar.
+/// Round ink chip with the paper mark — the assistant avatar.
 class HalisAvatar extends StatelessWidget {
   const HalisAvatar({super.key, this.size = 30});
 
@@ -68,15 +68,16 @@ class HalisAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.halis;
     return Container(
       width: size,
       height: size,
-      decoration: const BoxDecoration(
-        color: HalisPalette.ink,
+      decoration: BoxDecoration(
+        color: c.ink,
         shape: BoxShape.circle,
       ),
       child: Center(
-        child: HalisMark(size: size * 0.46, color: HalisPalette.paper),
+        child: HalisMark(size: size * 0.46, color: c.paper),
       ),
     );
   }

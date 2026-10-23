@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
+import '../core/strings.dart';
 import '../core/utils.dart';
 import '../data/chat_repository.dart';
 import '../gateway/kilo_gateway.dart';
@@ -20,15 +21,18 @@ class ChatController extends ChangeNotifier {
   ChatController({
     required this.conversationId,
     this.isNewConversation = false,
+    Strings? strings,
     ChatRepository? repository,
     KiloGateway? gateway,
   })  : _repo = repository ?? ChatRepository.instance,
-        _gateway = gateway ?? KiloGateway();
+        _gateway = gateway ?? KiloGateway(),
+        _strings = strings ?? Strings.of(AppLocale.english);
 
   final String conversationId;
   final bool isNewConversation;
   final ChatRepository _repo;
   final KiloGateway _gateway;
+  final Strings _strings;
 
   /// Ordered oldest → newest.
   final List<ChatMessage> messages = <ChatMessage>[];
@@ -168,7 +172,7 @@ class ChatController extends ChangeNotifier {
             _streaming = false;
             _activeAbort = null;
             assistant.state = MessageState.failed;
-            assistant.error = _lastError?.userMessage;
+            assistant.error = _messageFor(_lastError);
             await _persist(assistant);
             _notify();
             return;
@@ -179,7 +183,7 @@ class ChatController extends ChangeNotifier {
           _streaming = false;
           _activeAbort = null;
           assistant.state = MessageState.failed;
-          assistant.error = _lastError?.userMessage;
+          assistant.error = _messageFor(_lastError);
           await _persist(assistant);
           _notify();
           return;
@@ -188,6 +192,17 @@ class ChatController extends ChangeNotifier {
   }
 
   HalisError? _lastError;
+
+  /// Maps a transport failure to localized user-facing text. The gateway
+  /// only deals in codes; wording lives with the active locale.
+  String _messageFor(HalisError? error) => switch (error?.code) {
+        HalisErrorCode.network => _strings.errNetwork,
+        HalisErrorCode.timeout => _strings.errTimeout,
+        HalisErrorCode.server => _strings.errServer,
+        HalisErrorCode.rateLimited => _strings.errRateLimited,
+        HalisErrorCode.cancelled => _strings.stoppedInline,
+        _ => _strings.errUnknown,
+      };
 
   Future<_TurnResult> _streamOnce(ChatMessage assistant, AbortHandle abort) async {
     var sawContent = false;

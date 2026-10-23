@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../../core/utils.dart';
 import '../../engine/app_store.dart';
@@ -17,15 +16,17 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = context.watch<AppStore>();
+    final s = store.strings;
+    final c = context.halis;
 
     return Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
-            const HalisMark(size: 20, color: HalisPalette.ink),
+            HalisMark(size: 20, color: c.ink),
             const SizedBox(width: 7),
-            const Text(
-              '${HalisStrings.appName}.',
+            Text(
+              '${s.appName}.',
               style: TextStyle(
                 fontSize: 19,
                 fontWeight: FontWeight.w700,
@@ -36,7 +37,7 @@ class HomeScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            tooltip: HalisStrings.settings,
+            tooltip: s.settings,
             icon: const Icon(Icons.settings_outlined),
             onPressed: () =>
                 Navigator.of(context).push(SettingsScreen.route()),
@@ -46,22 +47,22 @@ class HomeScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openNewChat(context),
-        backgroundColor: HalisPalette.ink,
-        foregroundColor: HalisPalette.paper,
+        backgroundColor: c.ink,
+        foregroundColor: c.paper,
         elevation: 0,
         highlightElevation: 0,
         extendedPadding: const EdgeInsets.symmetric(horizontal: 20),
         shape: const StadiumBorder(),
         icon: const Icon(Icons.edit_outlined, size: 19),
-        label: const Text(
-          HalisStrings.newChat,
+        label: Text(
+          s.newChat,
           style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
         ),
       ),
       body: !store.loaded
           ? const SizedBox.shrink()
           : store.conversations.isEmpty
-              ? const _EmptyHome()
+              ? _EmptyHome()
               : _ConversationGroups(conversations: store.conversations),
     );
   }
@@ -78,6 +79,9 @@ class _EmptyHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.watch<AppStore>().strings;
+    final c = context.halis;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 36),
@@ -87,17 +91,17 @@ class _EmptyHome extends StatelessWidget {
             Container(
               width: 84,
               height: 84,
-              decoration: const BoxDecoration(
-                color: HalisPalette.ink,
+              decoration: BoxDecoration(
+                color: c.ink,
                 shape: BoxShape.circle,
               ),
-              child: const Center(
-                child: HalisMark(size: 40, color: HalisPalette.paper),
+              child: Center(
+                child: HalisMark(size: 40, color: c.paper),
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              HalisStrings.homeEmptyTitle,
+            Text(
+              s.homeEmptyTitle,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 23,
@@ -106,14 +110,10 @@ class _EmptyHome extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 9),
-            const Text(
-              HalisStrings.homeEmptySubtitle,
+            Text(
+              s.homeEmptySubtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14.5,
-                height: 1.55,
-                color: HalisPalette.inkSoft,
-              ),
+              style: TextStyle(fontSize: 14.5, height: 1.55, color: c.inkSoft),
             ),
             const SizedBox(height: 30),
             FilledButton(
@@ -121,16 +121,17 @@ class _EmptyHome extends StatelessWidget {
                 ChatScreen.route(conversationId: HalisUtils.uuid()),
               ),
               style: FilledButton.styleFrom(
-                backgroundColor: HalisPalette.ink,
-                foregroundColor: HalisPalette.paper,
+                backgroundColor: c.ink,
+                foregroundColor: c.paper,
                 minimumSize: const Size(0, 52),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
                 shape: const StadiumBorder(),
               ),
-              child: const Text(
-                HalisStrings.homeEmptyCta,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              child: Text(
+                s.homeEmptyCta,
+                style:
+                    TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -147,6 +148,7 @@ class _ConversationGroups extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.watch<AppStore>().strings;
     // conversations are already sorted newest-first; bucket them by day.
     final buckets = <String, List<Conversation>>{};
     const order = ['today', 'yesterday', 'last7', 'earlier'];
@@ -161,10 +163,10 @@ class _ConversationGroups extends StatelessWidget {
         for (final key in order)
           if (buckets.containsKey(key)) ...[
             _GroupLabel(label: switch (key) {
-              'today' => HalisStrings.today,
-              'yesterday' => HalisStrings.yesterday,
-              'last7' => HalisStrings.last7Days,
-              _ => HalisStrings.earlier,
+              'today' => s.today,
+              'yesterday' => s.yesterday,
+              'last7' => s.last7Days,
+              _ => s.earlier,
             }),
             for (final c in buckets[key]!)
               _ConversationTile(conversation: c),
@@ -181,15 +183,16 @@ class _GroupLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.halis;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
       child: Text(
         label.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
           letterSpacing: 1.2,
-          color: HalisPalette.inkFaint,
+          color: c.inkFaint,
         ),
       ),
     );
@@ -204,20 +207,24 @@ class _ConversationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = context.read<AppStore>();
+    final s = store.strings;
+    final c = context.halis;
+    final title =
+        conversation.title.isEmpty ? s.untitledConversation : conversation.title;
+
     return Dismissible(
       key: ValueKey('conv-${conversation.id}'),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),
-        color: HalisPalette.dangerSoft,
-        child: const Icon(Icons.delete_outline_rounded,
-            color: HalisPalette.danger),
+        color: c.dangerSoft,
+        child: Icon(Icons.delete_outline_rounded, color: c.danger),
       ),
       confirmDismiss: (_) => _confirmDelete(context),
       onDismissed: (_) => store.deleteConversation(conversation.id),
       child: Material(
-        color: HalisPalette.paper,
+        color: c.paper,
         child: InkWell(
           onTap: () => Navigator.of(context).push(
             ChatScreen.route(
@@ -234,14 +241,14 @@ class _ConversationTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        conversation.title,
+                        title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                           letterSpacing: -0.2,
-                          color: HalisPalette.ink,
+                          color: c.ink,
                         ),
                       ),
                       if (conversation.lastPreview.isNotEmpty) ...[
@@ -250,10 +257,7 @@ class _ConversationTile extends StatelessWidget {
                           conversation.lastPreview,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: HalisPalette.inkSoft,
-                          ),
+                          style: TextStyle(fontSize: 13, color: c.inkSoft),
                         ),
                       ],
                     ],
@@ -261,11 +265,11 @@ class _ConversationTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  HalisUtils.shortDate(conversation.updatedAt),
-                  style: const TextStyle(
+                  HalisUtils.shortDate(conversation.updatedAt, s),
+                  style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w500,
-                    color: HalisPalette.inkFaint,
+                    color: c.inkFaint,
                   ),
                 ),
               ],
@@ -277,27 +281,28 @@ class _ConversationTile extends StatelessWidget {
   }
 
   Future<bool> _confirmDelete(BuildContext context) async {
+    final s = context.read<AppStore>().strings;
+    final c = context.halis;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text(
-          HalisStrings.deleteConversation,
+        title: Text(
+          s.deleteConversation,
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
         ),
-        content: const Text(
-          HalisStrings.deleteConversationConfirm,
-          style: TextStyle(
-              fontSize: 14, height: 1.5, color: HalisPalette.inkSoft),
+        content: Text(
+          s.deleteConversationConfirm,
+          style: TextStyle(fontSize: 14, height: 1.5, color: c.inkSoft),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(HalisStrings.cancel),
+            child: Text(s.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: HalisPalette.danger),
-            child: const Text(HalisStrings.delete),
+            style: TextButton.styleFrom(foregroundColor: c.danger),
+            child: Text(s.delete),
           ),
         ],
       ),

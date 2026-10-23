@@ -17,6 +17,7 @@ dependencies:
   # local storage
   sqflite: ^2.4.5
   path: ^1.9.1
+  shared_preferences: ^2.5.3
 
   # LLM-friendly markdown rendering for chat bubbles
   gpt_markdown: ^1.4.0
@@ -42,9 +43,11 @@ flutter_launcher_icons:
 
 flutter_native_splash:
   color: "#FFFFFF"
+  color_dark: "#0E0E11"
   image: "assets/brand/splash_wordmark.png"
   android_12:
     color: "#FFFFFF"
+    color_dark: "#0E0E11"
     image: "assets/brand/ic_a12.png"
   android: true
   ios: false

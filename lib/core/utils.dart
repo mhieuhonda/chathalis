@@ -1,6 +1,11 @@
 import 'dart:math';
 
+import 'strings.dart';
+
 /// Small helpers shared across the app.
+///
+/// Anything that produces user-visible text takes the [Strings] bundle so
+/// wording stays with the active locale; utilities here stay mechanical.
 abstract final class HalisUtils {
   /// Cryptographically-random UUID v4.
   static String uuid() {
@@ -18,19 +23,16 @@ abstract final class HalisUtils {
   static String clock(DateTime t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-  /// Short label for a conversation tile: `14:05` today, `T4` this week,
+  /// Short label for a conversation tile: `14:05` today, `Wed` this week,
   /// `12/03` this year, `12/03/2025` otherwise.
-  static String shortDate(DateTime t, [DateTime? now]) {
+  static String shortDate(DateTime t, Strings s, [DateTime? now]) {
     final n = now ?? DateTime.now();
     final today = DateTime(n.year, n.month, n.day);
     final day = DateTime(t.year, t.month, t.day);
     final diffDays = today.difference(day).inDays;
     if (diffDays <= 0) return clock(t);
-    if (diffDays == 1) return 'Hôm qua';
-    if (diffDays < 7) {
-      const labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-      return labels[t.weekday - 1];
-    }
+    if (diffDays == 1) return s.yesterday;
+    if (diffDays < 7) return s.weekdayShort(t.weekday);
     final d = t.day.toString().padLeft(2, '0');
     final m = t.month.toString().padLeft(2, '0');
     if (t.year == n.year) return '$d/$m';
@@ -67,15 +69,5 @@ abstract final class HalisUtils {
     final flat = text.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (flat.length <= max) return flat;
     return '${flat.substring(0, max).trimRight()}…';
-  }
-
-  /// Human-readable duration for the thinking panel: `12 giây`, `1 phút 05`.
-  static String humanDuration(int ms) {
-    if (ms < 1000) return '<1 giây';
-    final s = ms ~/ 1000;
-    if (s < 60) return '$s giây';
-    final m = s ~/ 60;
-    final r = (s % 60).toString().padLeft(2, '0');
-    return '$m phút $r';
   }
 }

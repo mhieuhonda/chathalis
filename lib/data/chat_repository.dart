@@ -109,9 +109,8 @@ class ChatRepository {
       for (final r in rows)
         Conversation(
           id: r['id']! as String,
-          title: (r['title']! as String).isEmpty
-              ? 'Cuộc trò chuyện mới'
-              : r['title']! as String,
+          // Empty titles render as "Untitled chat" in the UI, localized.
+          title: (r['title'] ?? '') as String,
           createdAt:
               DateTime.fromMillisecondsSinceEpoch(r['created_at']! as int),
           updatedAt:
@@ -129,9 +128,7 @@ class ChatRepository {
     final r = rows.first;
     return Conversation(
       id: r['id']! as String,
-      title: (r['title']! as String).isEmpty
-          ? 'Cuộc trò chuyện mới'
-          : r['title']! as String,
+      title: (r['title'] ?? '') as String,
       createdAt: DateTime.fromMillisecondsSinceEpoch(r['created_at']! as int),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(r['updated_at']! as int),
       lastPreview: (r['last_preview'] ?? '') as String,

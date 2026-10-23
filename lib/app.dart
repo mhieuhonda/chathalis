@@ -10,15 +10,17 @@ class ChatHalisApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AppStore()..load(),
-      child: MaterialApp(
-        title: 'ChatHalis',
-        debugShowCheckedModeBanner: false,
-        theme: HalisTheme.light(),
-        themeMode: ThemeMode.light,
-        home: const HomeScreen(),
-      ),
+    final store = context.watch<AppStore>();
+
+    return MaterialApp(
+      title: 'ChatHalis',
+      debugShowCheckedModeBanner: false,
+      theme: HalisTheme.light(),
+      darkTheme: HalisTheme.dark(),
+      themeMode: store.theme == ThemeSetting.dark
+          ? ThemeMode.dark
+          : ThemeMode.light,
+      home: const HomeScreen(),
     );
   }
 }

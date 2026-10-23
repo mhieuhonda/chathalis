@@ -10,6 +10,7 @@ class UserBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.halis;
     final maxWidth = MediaQuery.sizeOf(context).width * 0.82;
     return Align(
       alignment: Alignment.centerRight,
@@ -17,9 +18,9 @@ class UserBubble extends StatelessWidget {
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-          decoration: const BoxDecoration(
-            color: HalisPalette.ink,
-            borderRadius: BorderRadius.only(
+          decoration: BoxDecoration(
+            color: c.ink,
+            borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
               bottomLeft: Radius.circular(20),
@@ -29,8 +30,8 @@ class UserBubble extends StatelessWidget {
           child: SelectionArea(
             child: Text(
               text,
-              style: const TextStyle(
-                color: HalisPalette.paper,
+              style: TextStyle(
+                color: c.paper,
                 fontSize: 15.5,
                 height: 1.5,
               ),

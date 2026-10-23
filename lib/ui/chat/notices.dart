@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../../core/strings.dart';
 import '../../core/theme.dart';
+import '../../engine/app_store.dart';
 
 /// Amber inline notice shown when a reply is cut off by the 32k output cap.
 class TruncationNotice extends StatelessWidget {
@@ -9,30 +10,31 @@ class TruncationNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.halis;
     return Container(
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: HalisPalette.warnSoft,
+        color: c.warnSoft,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.warning_amber_rounded,
             size: 17,
-            color: HalisPalette.warn,
+            color: c.warn,
           ),
           const SizedBox(width: 9),
           Expanded(
             child: Text(
-              HalisStrings.truncatedNotice,
-              style: const TextStyle(
+              context.watch<AppStore>().strings.truncatedNotice,
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 height: 1.45,
-                color: HalisPalette.warn,
+                color: c.warn,
               ),
             ),
           ),
@@ -48,18 +50,19 @@ class StoppedNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.only(top: 8),
+    final c = context.halis;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.stop_circle_outlined, size: 13, color: HalisPalette.inkFaint),
-          SizedBox(width: 6),
+          Icon(Icons.stop_circle_outlined, size: 13, color: c.inkFaint),
+          const SizedBox(width: 6),
           Text(
-            HalisStrings.stopped,
+            context.watch<AppStore>().strings.stopped,
             style: TextStyle(
               fontSize: 12.5,
-              color: HalisPalette.inkFaint,
+              color: c.inkFaint,
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -78,11 +81,12 @@ class ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.halis;
     return Container(
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
       decoration: BoxDecoration(
-        color: HalisPalette.dangerSoft,
+        color: c.dangerSoft,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -91,17 +95,16 @@ class ErrorCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.error_outline_rounded,
-                  size: 17, color: HalisPalette.danger),
+              Icon(Icons.error_outline_rounded, size: 17, color: c.danger),
               const SizedBox(width: 9),
               Expanded(
                 child: Text(
                   message,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     height: 1.45,
-                    color: HalisPalette.danger,
+                    color: c.danger,
                   ),
                 ),
               ),
@@ -112,14 +115,14 @@ class ErrorCard extends StatelessWidget {
             child: TextButton(
               onPressed: onRetry,
               style: TextButton.styleFrom(
-                foregroundColor: HalisPalette.danger,
+                foregroundColor: c.danger,
                 minimumSize: const Size(44, 34),
                 textStyle: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              child: Text(HalisStrings.retry),
+              child: Text(context.watch<AppStore>().strings.retry),
             ),
           ),
         ],

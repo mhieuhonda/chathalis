@@ -3,9 +3,10 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme.dart';
 
-/// Dark code block for the markdown renderer — the one intentionally dark
-/// surface in the app. Shows the language tag and a copy button; an unclosed
-/// fence while streaming renders a caret so it reads as "still typing".
+/// Dark code block for the markdown renderer — deliberately dark in light
+/// mode, quietly raised in dark. Shows the language tag and a copy button;
+/// an unclosed fence while streaming renders a caret so it reads as
+/// "still typing".
 class CodeBlockView extends StatefulWidget {
   const CodeBlockView({
     super.key,
@@ -36,11 +37,12 @@ class _CodeBlockViewState extends State<CodeBlockView> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.halis;
     final lang = widget.language.trim().isEmpty ? 'code' : widget.language.trim();
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: HalisPalette.codeBg,
+        color: c.codeBg,
         borderRadius: BorderRadius.circular(14),
       ),
       clipBehavior: Clip.antiAlias,
@@ -53,12 +55,12 @@ class _CodeBlockViewState extends State<CodeBlockView> {
               children: [
                 Text(
                   lang.toLowerCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'JetBrainsMono',
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 0.4,
-                    color: HalisPalette.codeMuted,
+                    color: c.codeMuted,
                   ),
                 ),
                 const Spacer(),
@@ -69,7 +71,7 @@ class _CodeBlockViewState extends State<CodeBlockView> {
                     onPressed: _copy,
                     padding: EdgeInsets.zero,
                     iconSize: 15,
-                    color: HalisPalette.codeMuted,
+                    color: c.codeMuted,
                     icon: Icon(_copied
                         ? Icons.check_rounded
                         : Icons.copy_rounded),
@@ -88,11 +90,11 @@ class _CodeBlockViewState extends State<CodeBlockView> {
               scrollDirection: Axis.horizontal,
               child: SelectableText(
                 widget.closed ? widget.code : '${widget.code}▍',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'JetBrainsMono',
                   fontSize: 12.5,
                   height: 1.6,
-                  color: HalisPalette.codeFg,
+                  color: c.codeFg,
                 ),
               ),
             ),

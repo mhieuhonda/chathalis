@@ -46,11 +46,24 @@ void main() {
     });
   });
 
-  group('HalisUtils.humanDuration', () {
-    test('formats thinking time in Vietnamese', () {
-      expect(HalisUtils.humanDuration(300), '<1 giây');
-      expect(HalisUtils.humanDuration(4200), '4 giây');
-      expect(HalisUtils.humanDuration(75_000), '1 phút 15');
+  group('HalisUtils.shortDate', () {
+    final now = DateTime(2026, 10, 23, 15, 0);
+    final en = Strings.of(AppLocale.english);
+    final vi = Strings.of(AppLocale.vietnamese);
+
+    test('clock time for today', () {
+      expect(HalisUtils.shortDate(DateTime(2026, 10, 23, 9, 5), en, now), '09:05');
+    });
+
+    test('yesterday label is localized', () {
+      expect(HalisUtils.shortDate(DateTime(2026, 10, 22, 23), en, now), 'Yesterday');
+      expect(HalisUtils.shortDate(DateTime(2026, 10, 22, 23), vi, now), 'Hôm qua');
+    });
+
+    test('weekday label is localized', () {
+      // 2026-10-21 is a Wednesday.
+      expect(HalisUtils.shortDate(DateTime(2026, 10, 21), en, now), 'Wed');
+      expect(HalisUtils.shortDate(DateTime(2026, 10, 21), vi, now), 'T4');
     });
   });
 
@@ -64,12 +77,35 @@ void main() {
     });
   });
 
-  group('HalisStrings', () {
-    test('the output-limit notice is exact', () {
+  group('Strings', () {
+    test('the Vietnamese output-limit notice stays exact', () {
       expect(
-        HalisStrings.truncatedNotice,
+        Strings.of(AppLocale.vietnamese).truncatedNotice,
         'câu trả lời này đã bị ngắt vì đạt giới hạn đầu ra',
       );
+    });
+
+    test('english is the default bundle', () {
+      expect(Strings.of(AppLocale.english).settings, 'Settings');
+      expect(Strings.of(AppLocale.english).untitledConversation, 'Untitled chat');
+    });
+
+    test('bundles are cached per locale', () {
+      expect(identical(Strings.of(AppLocale.english), Strings.of(AppLocale.english)),
+          isTrue);
+    });
+
+    test('thinking time is localized', () {
+      expect(Strings.of(AppLocale.english).humanDuration(4200), '4s');
+      expect(Strings.of(AppLocale.vietnamese).humanDuration(4200), '4 giây');
+      expect(Strings.of(AppLocale.english).humanDuration(75_000), '1m 15 s');
+      expect(Strings.of(AppLocale.vietnamese).humanDuration(75_000), '1 phút 15');
+    });
+
+    test('data counts pluralize in english', () {
+      expect(Strings.of(AppLocale.english).dataCounts(1, 1), '1 conversation · 1 message');
+      expect(Strings.of(AppLocale.english).dataCounts(3, 5), '3 conversations · 5 messages');
+      expect(Strings.of(AppLocale.vietnamese).dataCounts(3, 5), '3 cuộc trò chuyện · 5 tin nhắn');
     });
   });
 }

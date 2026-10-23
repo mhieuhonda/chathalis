@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../../core/strings.dart';
 import '../../core/theme.dart';
-import '../../core/utils.dart';
+import '../../engine/app_store.dart';
 
 /// Collapsible chain-of-thought panel, DeepSeek-style: live while the model
 /// thinks, collapsed to a one-line summary once the answer starts.
@@ -64,10 +64,12 @@ class _ThinkingPanelState extends State<ThinkingPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.watch<AppStore>().strings;
+    final c = context.halis;
     final live = widget.streaming;
     final heading = live
-        ? HalisStrings.thinkingNow
-        : '${HalisStrings.thoughtFor}${widget.reasoningMs == null ? '' : ' · ${HalisUtils.humanDuration(widget.reasoningMs!)}'}';
+        ? s.thinkingNow
+        : '${s.thoughtFor}${widget.reasoningMs == null ? '' : ' · ${s.humanDuration(widget.reasoningMs!)}'}';
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
@@ -75,7 +77,7 @@ class _ThinkingPanelState extends State<ThinkingPanel> {
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
-          color: HalisPalette.surface,
+          color: c.surface,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
@@ -95,47 +97,34 @@ class _ThinkingPanelState extends State<ThinkingPanel> {
                       Icon(
                         Icons.psychology_rounded,
                         size: 16,
-                        color: live ? HalisPalette.accent : HalisPalette.inkSoft,
+                        color: live ? c.accent : c.inkSoft,
                       ),
                       const SizedBox(width: 8),
-                      if (live)
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Text(
-                                heading,
-                                style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w500,
-                                  color: HalisPalette.inkSoft,
-                                  letterSpacing: 0.1,
-                                ),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Text(
+                              heading,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: c.inkSoft,
+                                letterSpacing: 0.1,
                               ),
-                              const SizedBox(width: 2),
-                              const _LiveEllipsis(),
-                            ],
-                          ),
-                        )
-                      else
-                        Expanded(
-                          child: Text(
-                            heading,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w500,
-                              color: HalisPalette.inkSoft,
-                              letterSpacing: 0.1,
                             ),
-                          ),
+                            const SizedBox(width: 2),
+                            if (live) const _LiveEllipsis(),
+                          ],
                         ),
+                      ),
                       if (!live)
                         AnimatedRotation(
                           turns: _expanded ? 0.5 : 0,
                           duration: const Duration(milliseconds: 200),
-                          child: const Icon(
+                          child: Icon(
                             Icons.expand_more_rounded,
                             size: 18,
-                            color: HalisPalette.inkFaint,
+                            color: c.inkFaint,
                           ),
                         ),
                     ],
@@ -149,7 +138,7 @@ class _ThinkingPanelState extends State<ThinkingPanel> {
               crossFadeState: _expanded
                   ? CrossFadeState.showFirst
                   : CrossFadeState.showSecond,
-              firstChild: _buildBody(),
+              firstChild: _buildBody(c),
               secondChild: const SizedBox(width: double.infinity),
             ),
           ],
@@ -158,7 +147,7 @@ class _ThinkingPanelState extends State<ThinkingPanel> {
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(HalisStyle c) {
     final text = widget.reasoning.trim();
     if (text.isEmpty) return const SizedBox(width: double.infinity);
     return Container(
@@ -166,7 +155,7 @@ class _ThinkingPanelState extends State<ThinkingPanel> {
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       decoration: BoxDecoration(
-        color: HalisPalette.paper,
+        color: c.paper,
         borderRadius: BorderRadius.circular(10),
       ),
       child: ScrollConfiguration(
@@ -177,10 +166,10 @@ class _ThinkingPanelState extends State<ThinkingPanel> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               text,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 height: 1.55,
-                color: HalisPalette.inkSoft,
+                color: c.inkSoft,
               ),
             ),
           ),
@@ -213,6 +202,7 @@ class _LiveEllipsisState extends State<_LiveEllipsis>
 
   @override
   Widget build(BuildContext context) {
+    final c = context.halis;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(3, (i) {
@@ -223,7 +213,7 @@ class _LiveEllipsisState extends State<_LiveEllipsis>
                   curve: const _BreatheCurve()),
             ),
           ),
-          child: const _Dot(),
+          child: _Dot(c.inkSoft),
         );
       }),
     );
@@ -239,7 +229,9 @@ class _BreatheCurve extends Curve {
 }
 
 class _Dot extends StatelessWidget {
-  const _Dot();
+  const _Dot(this.color);
+
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -247,8 +239,8 @@ class _Dot extends StatelessWidget {
       width: 3.5,
       height: 3.5,
       margin: const EdgeInsets.symmetric(horizontal: 1.2),
-      decoration: const BoxDecoration(
-        color: HalisPalette.inkSoft,
+      decoration: BoxDecoration(
+        color: color,
         shape: BoxShape.circle,
       ),
     );
@@ -278,6 +270,7 @@ class _TypingDotsState extends State<TypingDots>
 
   @override
   Widget build(BuildContext context) {
+    final c = context.halis;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(3, (i) {
@@ -291,7 +284,7 @@ class _TypingDotsState extends State<TypingDots>
               height: 7,
               margin: const EdgeInsets.symmetric(horizontal: 3),
               decoration: BoxDecoration(
-                color: HalisPalette.inkFaint.withValues(alpha: opacity),
+                color: c.inkFaint.withValues(alpha: opacity),
                 shape: BoxShape.circle,
               ),
             );

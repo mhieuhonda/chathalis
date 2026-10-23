@@ -104,20 +104,15 @@ void main() {
     });
   });
 
-  group('HalisError.userMessage', () {
-    test('network errors get a friendly Vietnamese message', () {
-      expect(
-        const HalisError(HalisErrorCode.network).userMessage,
-        contains('Không kết nối được'),
-      );
-      expect(
-        const HalisError(HalisErrorCode.timeout).userMessage,
-        contains('phản hồi quá lâu'),
-      );
-      expect(
-        const HalisError(HalisErrorCode.server).userMessage,
-        contains('bận'),
-      );
+  group('KiloGateway.classifyStatus', () {
+    test('429 is the rate limit, never a generic client error', () {
+      expect(KiloGateway.classifyStatus(429), HalisErrorCode.rateLimited);
+    });
+
+    test('5xx stays a server error, other 4xx a bad request', () {
+      expect(KiloGateway.classifyStatus(503), HalisErrorCode.server);
+      expect(KiloGateway.classifyStatus(400), HalisErrorCode.badRequest);
+      expect(KiloGateway.classifyStatus(200), HalisErrorCode.unknown);
     });
   });
 }
